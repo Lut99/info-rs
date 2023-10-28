@@ -4,7 +4,7 @@
 //  Created:
 //    28 Oct 2023, 11:28:42
 //  Last edited:
-//    28 Oct 2023, 13:11:27
+//    28 Oct 2023, 13:12:28
 //  Auto updated?
 //    Yes
 //
@@ -335,7 +335,9 @@ pub trait Serializable<T: Serializer<Target = Self>> {
     /// This function may error with an [`Error::SerializeString`] if the
     /// backend serializer failed to serialize.
     #[inline]
-    fn to_string_pretty_opt(&self, pretty: bool) -> Result<String, Error<T::Error>> { if pretty { self.to_string_pretty() } else { self.to_string() } }
+    fn to_string_pretty_opt(&self, pretty: bool) -> Result<String, Error<T::Error>> {
+        if pretty { self.to_string_pretty() } else { self.to_string() }
+    }
     /// Convenience function for serializing this object to a writer using
     /// dynamic prettyness.
     ///
@@ -348,7 +350,9 @@ pub trait Serializable<T: Serializer<Target = Self>> {
     /// backend serializer failed to serialize. This may also be because it
     /// failed to write to the `writer`.
     #[inline]
-    fn to_writer_pretty_opt(&self, writer: impl Write, pretty: bool) -> Result<(), Error<T::Error>> { if pretty { self.to_writer_pretty(writer) } else { self.to_writer(writer) } }
+    fn to_writer_pretty_opt(&self, writer: impl Write, pretty: bool) -> Result<(), Error<T::Error>> {
+        if pretty { self.to_writer_pretty(writer) } else { self.to_writer(writer) }
+    }
     /// Convenience function for serializing this object to a path using
     /// dynamic prettyness.
     ///
@@ -362,5 +366,7 @@ pub trait Serializable<T: Serializer<Target = Self>> {
     /// backend serializer failed to serialize. This may also be because it
     /// failed to write to the file.
     #[inline]
-    fn to_path_pretty_opt(&self, path: impl AsRef<Path>, pretty: bool) -> Result<(), Error<T::Error>> { if pretty { self.to_path_pretty(path) } else { self.to_path(path) } }
+    fn to_path_pretty_opt(&self, path: impl AsRef<Path>, pretty: bool) -> Result<(), Error<T::Error>> {
+        if pretty { self.to_path_pretty(path) } else { self.to_path(path) }
+    }
 }
