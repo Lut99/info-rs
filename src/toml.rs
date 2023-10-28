@@ -4,7 +4,7 @@
 //  Created:
 //    28 Oct 2023, 13:05:57
 //  Last edited:
-//    28 Oct 2023, 13:08:03
+//    28 Oct 2023, 13:11:31
 //  Auto updated?
 //    Yes
 //
@@ -75,14 +75,10 @@ impl<T: for<'de> Deserialize<'de> + Serialize> serializer::Serializer for TomlSe
     type Target = T;
 
     #[inline]
-    fn to_string(value: &Self::Target) -> Result<String, Self::Error> {
-        toml::to_string(value).map_err(|err| TomlError::Serialize { err })
-    }
+    fn to_string(value: &Self::Target) -> Result<String, Self::Error> { toml::to_string(value).map_err(|err| TomlError::Serialize { err }) }
 
     #[inline]
-    fn to_string_pretty(value: &Self::Target) -> Result<String, Self::Error> {
-        toml::to_string_pretty(value).map_err(|err| TomlError::Serialize { err })
-    }
+    fn to_string_pretty(value: &Self::Target) -> Result<String, Self::Error> { toml::to_string_pretty(value).map_err(|err| TomlError::Serialize { err }) }
 
     #[inline]
     fn to_writer(value: &Self::Target, mut writer: impl Write) -> Result<(), Self::Error> {
@@ -115,9 +111,7 @@ impl<T: for<'de> Deserialize<'de> + Serialize> serializer::Serializer for TomlSe
     }
 
     #[inline]
-    fn from_str(raw: impl AsRef<str>) -> Result<Self::Target, Self::Error> {
-        toml::from_str(raw.as_ref()).map_err(|err| TomlError::Deserialize { err })
-    }
+    fn from_str(raw: impl AsRef<str>) -> Result<Self::Target, Self::Error> { toml::from_str(raw.as_ref()).map_err(|err| TomlError::Deserialize { err }) }
 
     #[inline]
     fn from_reader(mut reader: impl Read) -> Result<Self::Target, Self::Error> {

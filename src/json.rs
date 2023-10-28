@@ -4,7 +4,7 @@
 //  Created:
 //    28 Oct 2023, 13:02:40
 //  Last edited:
-//    28 Oct 2023, 13:07:39
+//    28 Oct 2023, 13:11:30
 //  Auto updated?
 //    Yes
 //
@@ -36,14 +36,10 @@ impl<T: for<'de> Deserialize<'de> + Serialize> serializer::Serializer for Serial
     fn to_string_pretty(value: &Self::Target) -> Result<String, Self::Error> { serde_json::to_string_pretty(value) }
 
     #[inline]
-    fn to_writer(value: &Self::Target, writer: impl Write) -> Result<(), Self::Error> {
-        serde_json::to_writer(writer, value)
-    }
+    fn to_writer(value: &Self::Target, writer: impl Write) -> Result<(), Self::Error> { serde_json::to_writer(writer, value) }
 
     #[inline]
-    fn to_writer_pretty(value: &Self::Target, writer: impl Write) -> Result<(), Self::Error> {
-        serde_json::to_writer_pretty(writer, value)
-    }
+    fn to_writer_pretty(value: &Self::Target, writer: impl Write) -> Result<(), Self::Error> { serde_json::to_writer_pretty(writer, value) }
 
     #[inline]
     fn from_str(raw: impl AsRef<str>) -> Result<Self::Target, Self::Error> { serde_json::from_str(raw.as_ref()) }

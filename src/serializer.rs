@@ -4,7 +4,7 @@
 //  Created:
 //    28 Oct 2023, 10:21:11
 //  Last edited:
-//    28 Oct 2023, 13:10:16
+//    28 Oct 2023, 13:11:24
 //  Auto updated?
 //    Yes
 //
@@ -83,9 +83,7 @@ pub trait Serializer {
     /// This function may error if the given value was not serializable in its
     /// current state, or if it failed to write to the given `writer`.
     #[inline]
-    fn to_writer_pretty(value: &Self::Target, writer: impl Write) -> Result<(), Self::Error> {
-        Self::to_writer(value, writer)
-    }
+    fn to_writer_pretty(value: &Self::Target, writer: impl Write) -> Result<(), Self::Error> { Self::to_writer(value, writer) }
 
     /// Deserializes the given string as a representation for the target type in
     /// the backend format.
