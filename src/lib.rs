@@ -4,7 +4,7 @@
 //  Created:
 //    24 Oct 2023, 22:36:08
 //  Last edited:
-//    29 Oct 2023, 11:58:46
+//    29 Oct 2023, 14:11:06
 //  Auto updated?
 //    Yes
 //
@@ -17,8 +17,8 @@
 pub mod dummy;
 #[cfg(feature = "serde-json")]
 pub mod json;
-pub mod serializable;
-pub mod serializer;
+mod serializable;
+mod serializer;
 #[cfg(feature = "serde-toml")]
 pub mod toml;
 #[cfg(feature = "serde-yaml")]

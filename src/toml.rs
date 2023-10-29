@@ -4,7 +4,7 @@
 //  Created:
 //    28 Oct 2023, 13:05:57
 //  Last edited:
-//    29 Oct 2023, 11:46:01
+//    29 Oct 2023, 14:17:20
 //  Auto updated?
 //    Yes
 //
@@ -23,7 +23,7 @@ use crate::serializer;
 
 
 /***** ERRORS *****/
-/// Defines errors that occur when using the [`TomlSerializer`].
+/// Defines errors that occur when using the TOML [`Serializer`].
 #[derive(Debug)]
 pub enum Error {
     /// Failed to write to the given writer.

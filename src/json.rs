@@ -4,7 +4,7 @@
 //  Created:
 //    28 Oct 2023, 13:02:40
 //  Last edited:
-//    29 Oct 2023, 11:45:06
+//    29 Oct 2023, 14:17:33
 //  Auto updated?
 //    Yes
 //
@@ -23,6 +23,7 @@ use crate::serializer;
 
 
 /***** ERRORS *****/
+/// Defines errors that occur when using the JSON [`Serializer`].
 #[derive(Debug)]
 pub enum Error {
     /// Failed to write to the given writer.

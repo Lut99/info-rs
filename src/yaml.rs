@@ -4,7 +4,7 @@
 //  Created:
 //    28 Oct 2023, 13:04:05
 //  Last edited:
-//    29 Oct 2023, 11:45:16
+//    29 Oct 2023, 14:17:40
 //  Auto updated?
 //    Yes
 //
@@ -23,6 +23,7 @@ use crate::serializer;
 
 
 /***** ERRORS *****/
+/// Defines errors that occur when using the YAML [`Serializer`].
 #[derive(Debug)]
 pub enum Error {
     /// Failed to write to the given writer.
