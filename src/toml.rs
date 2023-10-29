@@ -4,7 +4,7 @@
 //  Created:
 //    28 Oct 2023, 13:05:57
 //  Last edited:
-//    28 Oct 2023, 13:12:31
+//    29 Oct 2023, 11:46:01
 //  Auto updated?
 //    Yes
 //
@@ -12,7 +12,7 @@
 //!   Implements [`serializer::Serializer`] and cohorts for [`toml`].
 //
 
-use std::error::Error;
+use std::error;
 use std::fmt::{Display, Formatter, Result as FResult};
 use std::io::{Read, Write};
 use std::marker::PhantomData;
@@ -24,9 +24,8 @@ use crate::serializer;
 
 /***** ERRORS *****/
 /// Defines errors that occur when using the [`TomlSerializer`].
-#[cfg(feature = "serde-toml")]
 #[derive(Debug)]
-pub enum TomlError {
+pub enum Error {
     /// Failed to write to the given writer.
     Write { err: std::io::Error },
     /// Failed to read from the given reader.
@@ -37,9 +36,9 @@ pub enum TomlError {
     Deserialize { err: toml::de::Error },
 }
 #[cfg(feature = "serde-toml")]
-impl Display for TomlError {
+impl Display for Error {
     fn fmt(&self, f: &mut Formatter<'_>) -> FResult {
-        use TomlError::*;
+        use Error::*;
         match self {
             Write { .. } => write!(f, "Failed to write to given writer"),
             Read { .. } => write!(f, "Failed to read from given reader"),
@@ -49,9 +48,9 @@ impl Display for TomlError {
     }
 }
 #[cfg(feature = "serde-toml")]
-impl Error for TomlError {
-    fn source(&self) -> Option<&(dyn Error + 'static)> {
-        use TomlError::*;
+impl error::Error for Error {
+    fn source(&self) -> Option<&(dyn error::Error + 'static)> {
+        use Error::*;
         match self {
             Write { err } => Some(err),
             Read { err } => Some(err),
@@ -68,32 +67,30 @@ impl Error for TomlError {
 /***** LIBRARY *****/
 /// Implements a [`serializer::Serializer`] for [`toml`].
 #[derive(Clone, Copy, Debug)]
-pub struct TomlSerializer<T>(PhantomData<T>);
+pub struct Serializer<T>(PhantomData<T>);
 
-impl<T: for<'de> Deserialize<'de> + Serialize> serializer::Serializer for TomlSerializer<T> {
-    type Error = TomlError;
+impl<T: for<'de> Deserialize<'de> + Serialize> serializer::Serializer for Serializer<T> {
+    type Error = Error;
     type Target = T;
 
     #[inline]
-    fn to_string(value: &Self::Target) -> Result<String, Self::Error> { toml::to_string(value).map_err(|err| TomlError::Serialize { err }) }
+    fn to_string(value: &Self::Target) -> Result<String, Self::Error> { toml::to_string(value).map_err(|err| Error::Serialize { err }) }
 
     #[inline]
-    fn to_string_pretty(value: &Self::Target) -> Result<String, Self::Error> {
-        toml::to_string_pretty(value).map_err(|err| TomlError::Serialize { err })
-    }
+    fn to_string_pretty(value: &Self::Target) -> Result<String, Self::Error> { toml::to_string_pretty(value).map_err(|err| Error::Serialize { err }) }
 
     #[inline]
     fn to_writer(value: &Self::Target, mut writer: impl Write) -> Result<(), Self::Error> {
         // Write to string first
         let raw: String = match toml::to_string(value) {
             Ok(raw) => raw,
-            Err(err) => return Err(TomlError::Serialize { err }),
+            Err(err) => return Err(Error::Serialize { err }),
         };
 
         // Then write to the writer
         match writer.write_all(raw.as_bytes()) {
             Ok(_) => Ok(()),
-            Err(err) => Err(TomlError::Write { err }),
+            Err(err) => Err(Error::Write { err }),
         }
     }
 
@@ -102,33 +99,80 @@ impl<T: for<'de> Deserialize<'de> + Serialize> serializer::Serializer for TomlSe
         // Write to string first
         let raw: String = match toml::to_string_pretty(value) {
             Ok(raw) => raw,
-            Err(err) => return Err(TomlError::Serialize { err }),
+            Err(err) => return Err(Error::Serialize { err }),
         };
 
         // Then write to the writer
         match writer.write_all(raw.as_bytes()) {
             Ok(_) => Ok(()),
-            Err(err) => Err(TomlError::Write { err }),
+            Err(err) => Err(Error::Write { err }),
         }
     }
 
     #[inline]
-    fn from_str(raw: impl AsRef<str>) -> Result<Self::Target, Self::Error> {
-        toml::from_str(raw.as_ref()).map_err(|err| TomlError::Deserialize { err })
-    }
+    fn from_str(raw: impl AsRef<str>) -> Result<Self::Target, Self::Error> { toml::from_str(raw.as_ref()).map_err(|err| Error::Deserialize { err }) }
 
     #[inline]
     fn from_reader(mut reader: impl Read) -> Result<Self::Target, Self::Error> {
         // Simply read the whole reader
         let mut raw: String = String::new();
         if let Err(err) = reader.read_to_string(&mut raw) {
-            return Err(TomlError::Read { err });
+            return Err(Error::Read { err });
         }
 
         // Now deserialize using the string edition
         match toml::from_str(&raw) {
             Ok(res) => Ok(res),
-            Err(err) => Err(TomlError::Deserialize { err }),
+            Err(err) => Err(Error::Deserialize { err }),
         }
+    }
+}
+
+#[cfg(feature = "async-tokio")]
+#[async_trait::async_trait]
+impl<T: Send + Sync + for<'de> Deserialize<'de> + Serialize> serializer::SerializerAsync for Serializer<T> {
+    #[inline]
+    async fn to_writer_async(value: &Self::Target, mut writer: impl Send + std::marker::Unpin + tokio::io::AsyncWrite) -> Result<(), Self::Error> {
+        use tokio::io::AsyncWriteExt;
+
+        // Serialize ourselves to a string first
+        let raw: String = <Self as serializer::Serializer>::to_string(value)?;
+
+        // Now write to the writer
+        match writer.write_all(raw.as_bytes()).await {
+            Ok(_) => Ok(()),
+            Err(err) => Err(Error::Write { err }),
+        }
+    }
+
+    #[inline]
+    async fn to_writer_pretty_async(
+        value: &Self::Target,
+        mut writer: impl Send + std::marker::Unpin + tokio::io::AsyncWrite,
+    ) -> Result<(), Self::Error> {
+        use tokio::io::AsyncWriteExt;
+
+        // Serialize ourselves to a string first
+        let raw: String = <Self as serializer::Serializer>::to_string_pretty(value)?;
+
+        // Now write to the writer
+        match writer.write_all(raw.as_bytes()).await {
+            Ok(_) => Ok(()),
+            Err(err) => Err(Error::Write { err }),
+        }
+    }
+
+    #[inline]
+    async fn from_reader_async(mut reader: impl Send + std::marker::Unpin + tokio::io::AsyncRead) -> Result<T, Self::Error> {
+        use tokio::io::AsyncReadExt;
+
+        // Read the entire buffer first
+        let mut raw: String = String::new();
+        if let Err(err) = reader.read_to_string(&mut raw).await {
+            return Err(Error::Read { err });
+        }
+
+        // Then deserialize as string
+        <Self as serializer::Serializer>::from_str(&raw)
     }
 }

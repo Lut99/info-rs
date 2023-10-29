@@ -4,7 +4,7 @@
 //  Created:
 //    28 Oct 2023, 10:21:11
 //  Last edited:
-//    28 Oct 2023, 13:12:32
+//    29 Oct 2023, 11:41:30
 //  Auto updated?
 //    Yes
 //
@@ -118,10 +118,59 @@ pub trait Serializer {
 
 
 
-/// Defines a complement to the [`Serializer`] that implements it asynchronously.
+/// Defines a complement to the [`Serializer`] that implements reader- and writer-related functions asynchronously.
 ///
 /// Note that support by backends for this varies. [`serde`](https://serde.rs)-related backends,
 /// for example, do not, and hence the file is read in memory in one go asynchronously and then
 /// parsed synchronously.
 #[cfg(feature = "async-tokio")]
-pub trait SerializerAsync: Serializer {}
+#[async_trait::async_trait]
+pub trait SerializerAsync: Serializer
+where
+    Self::Target: Send + Sync,
+{
+    /// Serializes the given value to the given writer asynchronously in accordance with the backend implementation.
+    ///
+    /// # Arguments
+    /// - `value`: The value to serialize.
+    /// - `writer`: The [`Write`]r to serialize to.
+    ///
+    /// # Errors
+    /// This function may error if the given value was not serializable in its
+    /// current state, or if it failed to write to the given `writer`.
+    async fn to_writer_async(value: &Self::Target, writer: impl Send + std::marker::Unpin + tokio::io::AsyncWrite) -> Result<(), Self::Error>;
+    /// Serializes the given value to the given writer asynchronously in accordance with the
+    /// backend implementation.
+    ///
+    /// Not all backends are expected to define a meaningful difference ([YAML](https://yaml.org)), for example.
+    /// If so, then the default implementation can be used, which is then simply
+    /// an alias for [`Self::to_writer()`](Serializer::to_writer()).
+    ///
+    /// # Arguments
+    /// - `value`: The value to serialize.
+    /// - `writer`: The [`Write`]r to serialize to.
+    ///
+    /// # Errors
+    /// This function may error if the given value was not serializable in its
+    /// current state, or if it failed to write to the given `writer`.
+    #[inline]
+    async fn to_writer_pretty_async(value: &Self::Target, writer: impl Send + std::marker::Unpin + tokio::io::AsyncWrite) -> Result<(), Self::Error> {
+        Self::to_writer_async(value, writer).await
+    }
+
+    /// Deserializes the contents of the given reader asynchronously as a representation for
+    /// the target type in the backend format.
+    ///
+    /// # Arguments
+    /// - `reader`: The [`Read`]er that contains the serialized representation
+    ///   of the target.
+    ///
+    /// # Returns
+    /// The deserialized target.
+    ///
+    /// # Errors
+    /// This function may error if the given `raw` is not a valid representation
+    /// for a target in the backend format, or if it failed to read from the
+    /// given `reader`.
+    async fn from_reader_async(reader: impl Send + std::marker::Unpin + tokio::io::AsyncRead) -> Result<Self::Target, Self::Error>;
+}
