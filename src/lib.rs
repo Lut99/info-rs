@@ -4,7 +4,7 @@
 //  Created:
 //    24 Oct 2023, 22:36:08
 //  Last edited:
-//    29 Oct 2023, 11:46:32
+//    29 Oct 2023, 11:58:46
 //  Auto updated?
 //    Yes
 //
@@ -14,6 +14,7 @@
 //
 
 // Declare the submodules
+pub mod dummy;
 #[cfg(feature = "serde-json")]
 pub mod json;
 pub mod serializable;
