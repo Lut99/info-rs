@@ -4,7 +4,7 @@
 //  Created:
 //    28 Oct 2023, 11:28:42
 //  Last edited:
-//    29 Oct 2023, 11:56:18
+//    29 Oct 2023, 17:37:42
 //  Auto updated?
 //    Yes
 //
@@ -98,8 +98,31 @@ impl<E: 'static + error::Error> error::Error for Error<E> {
 
 
 /***** LIBRARY **** */
-/// Conveniently implements functions to serialize- or deserialize a struct
-/// using serde (or other serializers).
+/// Conveniently implements functions to serialize- or deserialize a struct using serde (or other serializers).
+///
+/// # Examples
+/// ```rust
+/// use serde::{Deserialize, Serialize};
+/// use serializable::json::Serializer;
+/// use serializable::Serializable;
+///
+/// #[derive(Debug, Deserialize, Eq, PartialEq, Serialize)]
+/// struct HelloWorld {
+///     hello: String,
+///     world: String,
+/// }
+/// impl Serializable<Serializer<HelloWorld>> for HelloWorld {}
+///
+/// assert_eq!(
+///     HelloWorld { hello: "Hello".into(), world: "World".into() }.to_string().unwrap(),
+///     "{\"hello\":\"Hello\",\"world\":\"World\"}"
+/// );
+///
+/// assert_eq!(
+///     HelloWorld::from_str("{\"hello\":\"Goodbye\",\"world\":\"Planet\"}").unwrap(),
+///     HelloWorld { hello: "Goodbye".into(), world: "Planet".into() }
+/// )
+/// ```
 pub trait Serializable<T: Serializer<Target = Self>> {
     // Serializer backend aliases
     /// Serializes this object to a string.

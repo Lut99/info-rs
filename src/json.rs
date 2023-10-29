@@ -4,7 +4,7 @@
 //  Created:
 //    28 Oct 2023, 13:02:40
 //  Last edited:
-//    29 Oct 2023, 14:17:33
+//    29 Oct 2023, 17:26:39
 //  Auto updated?
 //    Yes
 //
@@ -70,6 +70,30 @@ impl error::Error for Error {
 
 /***** LIBRARY *****/
 /// Implements a [`serializer::Serializer`] for [`serde_json`].
+///
+/// # Examples
+/// ```rust
+/// use serde::{Deserialize, Serialize};
+/// use serializable::json::Serializer;
+/// use serializable::Serializable;
+///
+/// #[derive(Debug, Deserialize, Eq, PartialEq, Serialize)]
+/// struct HelloWorld {
+///     hello: String,
+///     world: String,
+/// }
+/// impl Serializable<Serializer<HelloWorld>> for HelloWorld {}
+///
+/// assert_eq!(
+///     HelloWorld { hello: "Hello".into(), world: "World".into() }.to_string().unwrap(),
+///     "{\"hello\":\"Hello\",\"world\":\"World\"}"
+/// );
+///
+/// assert_eq!(
+///     HelloWorld::from_str("{\"hello\":\"Goodbye\",\"world\":\"Planet\"}").unwrap(),
+///     HelloWorld { hello: "Goodbye".into(), world: "Planet".into() }
+/// )
+/// ```
 #[derive(Clone, Copy, Debug)]
 pub struct Serializer<T>(PhantomData<T>);
 

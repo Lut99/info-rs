@@ -4,7 +4,7 @@
 //  Created:
 //    29 Oct 2023, 11:59:19
 //  Last edited:
-//    29 Oct 2023, 14:45:48
+//    29 Oct 2023, 17:38:22
 //  Auto updated?
 //    Yes
 //
@@ -62,6 +62,47 @@ impl<E: 'static + error::Error> error::Error for Error<E> {
 /// Defines a dummy serializer that serializes naively using a type's [`ToString`]-implementation for serialization, and [`FromStr`] for deserialization.
 ///
 /// Mostly used in examples and (doc)tests.
+///
+/// # Examples
+/// ```rust
+/// use serializable::dummy::Serializer;
+/// use serializable::Serializable;
+///
+/// #[derive(Debug, Eq, PartialEq)]
+/// struct HelloWorld {
+///     hello: String,
+///     world: String,
+/// }
+/// impl std::str::FromStr for HelloWorld {
+///     type Err = std::convert::Infallible;
+///
+///     fn from_str(value: &str) -> Result<Self, Self::Err> {
+///         if let Some(pos) = value.find(',') {
+///             Ok(Self { hello: value[..pos].into(), world: value[pos + 1..].into() })
+///         } else {
+///             Ok(Self { hello: value.into(), world: "".into() })
+///         }
+///     }
+/// }
+/// impl ToString for HelloWorld {
+///     fn to_string(&self) -> String { format!("{},{}", self.hello, self.world) }
+/// }
+/// impl Serializable<Serializer<HelloWorld>> for HelloWorld {}
+///
+/// assert_eq!(
+///     <HelloWorld as Serializable<_>>::to_string(&HelloWorld {
+///         hello: "Hello".into(),
+///         world: "World".into(),
+///     })
+///     .unwrap(),
+///     "Hello,World"
+/// );
+///
+/// assert_eq!(HelloWorld::from_str("Goodbye,Planet").unwrap(), HelloWorld {
+///     hello: "Goodbye".into(),
+///     world: "Planet".into(),
+/// })
+/// ```
 #[derive(Clone, Copy, Debug)]
 pub struct Serializer<T>(PhantomData<T>);
 

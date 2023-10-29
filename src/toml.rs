@@ -4,7 +4,7 @@
 //  Created:
 //    28 Oct 2023, 13:05:57
 //  Last edited:
-//    29 Oct 2023, 14:17:20
+//    29 Oct 2023, 17:24:55
 //  Auto updated?
 //    Yes
 //
@@ -66,6 +66,30 @@ impl error::Error for Error {
 
 /***** LIBRARY *****/
 /// Implements a [`serializer::Serializer`] for [`toml`].
+///
+/// # Examples
+/// ```rust
+/// use serde::{Deserialize, Serialize};
+/// use serializable::toml::Serializer;
+/// use serializable::Serializable;
+///
+/// #[derive(Debug, Deserialize, Eq, PartialEq, Serialize)]
+/// struct HelloWorld {
+///     hello: String,
+///     world: String,
+/// }
+/// impl Serializable<Serializer<HelloWorld>> for HelloWorld {}
+///
+/// assert_eq!(
+///     HelloWorld { hello: "Hello".into(), world: "World".into() }.to_string().unwrap(),
+///     "hello = \"Hello\"\nworld = \"World\"\n"
+/// );
+///
+/// assert_eq!(
+///     HelloWorld::from_str("hello = \"Goodbye\"\nworld = \"Planet\"\n").unwrap(),
+///     HelloWorld { hello: "Goodbye".into(), world: "Planet".into() }
+/// )
+/// ```
 #[derive(Clone, Copy, Debug)]
 pub struct Serializer<T>(PhantomData<T>);
 
