@@ -4,7 +4,7 @@
 //  Created:
 //    28 Oct 2023, 10:21:11
 //  Last edited:
-//    29 Oct 2023, 14:51:54
+//    29 Oct 2023, 18:03:35
 //  Auto updated?
 //    Yes
 //
@@ -46,10 +46,10 @@ pub trait Serializer {
     /// use serializable::dummy::Serializer;
     /// use serializable::Serializer as _;
     ///
-    /// // The dummy parser can be used for any type implementing `FromStr` and `ToString`
-    /// assert_eq!(Serializer::to_string(&42u8).unwrap(), "42");
-    /// assert_eq!(Serializer::to_string(&String::from("42")).unwrap(), "42");
-    /// assert_eq!(Serializer::to_string(&true).unwrap(), "true");
+    /// // Note: the dummy parser actually doesn't serialize or deserialize, see the features for proper ones
+    /// assert_eq!(Serializer::to_string(&42u8).unwrap(), "<dummy_text>");
+    /// assert_eq!(Serializer::to_string(&String::from("42")).unwrap(), "<dummy_text>");
+    /// assert_eq!(Serializer::to_string(&true).unwrap(), "<dummy_text>");
     /// ```
     fn to_string(value: &Self::Target) -> Result<String, Self::Error>;
     /// Serializes the given value to a string in accordance with the backend
@@ -75,10 +75,10 @@ pub trait Serializer {
     /// use serializable::dummy::Serializer;
     /// use serializable::Serializer as _;
     ///
-    /// // The dummy parser can be used for any type implementing `FromStr` and `ToString`
-    /// assert_eq!(Serializer::to_string_pretty(&42u8).unwrap(), "Dummy<42>");
-    /// assert_eq!(Serializer::to_string_pretty(&String::from("42")).unwrap(), "Dummy<42>");
-    /// assert_eq!(Serializer::to_string_pretty(&true).unwrap(), "Dummy<true>");
+    /// // Note: the dummy parser actually doesn't serialize or deserialize, see the features for proper ones
+    /// assert_eq!(Serializer::to_string_pretty(&42u8).unwrap(), "Dummy Text");
+    /// assert_eq!(Serializer::to_string_pretty(&String::from("42")).unwrap(), "Dummy Text");
+    /// assert_eq!(Serializer::to_string_pretty(&true).unwrap(), "Dummy Text");
     #[inline]
     fn to_string_pretty(value: &Self::Target) -> Result<String, Self::Error> { Self::to_string(value) }
 
@@ -99,19 +99,20 @@ pub trait Serializer {
     /// use serializable::dummy::Serializer;
     /// use serializable::Serializer as _;
     ///
-    /// let mut buf: [u8; 4] = [0; 4];
+    /// let mut buf: [u8; 12] = [0; 12];
     ///
-    /// // The dummy parser can be used for any type implementing `FromStr` and `ToString`
+    /// // Note: the dummy parser actually doesn't serialize or deserialize, see the features for proper ones
     /// Serializer::to_writer(&42u8, &mut buf[..]).unwrap();
-    /// assert_eq!(String::from_utf8_lossy(&buf[..2]), "42");
+    /// assert_eq!(String::from_utf8_lossy(&buf), "<dummy_text>");
     ///
     /// Serializer::to_writer(&String::from("42"), &mut buf[..]).unwrap();
-    /// assert_eq!(String::from_utf8_lossy(&buf[..2]), "42");
+    /// assert_eq!(String::from_utf8_lossy(&buf), "<dummy_text>");
     ///
     /// Serializer::to_writer(&true, &mut buf[..]).unwrap();
-    /// assert_eq!(String::from_utf8_lossy(&buf), "true");
+    /// assert_eq!(String::from_utf8_lossy(&buf), "<dummy_text>");
     ///
     /// // Errors when writing are propagated
+    /// let mut buf: [u8; 0] = [];
     /// assert!(matches!(
     ///     Serializer::to_writer(&String::from("Hello, there!"), &mut buf[..]),
     ///     Err(serializable::dummy::Error::Write { .. })
@@ -140,19 +141,20 @@ pub trait Serializer {
     /// use serializable::dummy::Serializer;
     /// use serializable::Serializer as _;
     ///
-    /// let mut buf: [u8; 11] = [0; 11];
+    /// let mut buf: [u8; 10] = [0; 10];
     ///
-    /// // The dummy parser can be used for any type implementing `FromStr` and `ToString`
+    /// // Note: the dummy parser actually doesn't serialize or deserialize, see the features for proper ones
     /// Serializer::to_writer_pretty(&42u8, &mut buf[..]).unwrap();
-    /// assert_eq!(String::from_utf8_lossy(&buf[..9]), "Dummy<42>");
+    /// assert_eq!(String::from_utf8_lossy(&buf), "Dummy Text");
     ///
     /// Serializer::to_writer_pretty(&String::from("42"), &mut buf[..]).unwrap();
-    /// assert_eq!(String::from_utf8_lossy(&buf[..9]), "Dummy<42>");
+    /// assert_eq!(String::from_utf8_lossy(&buf), "Dummy Text");
     ///
     /// Serializer::to_writer_pretty(&true, &mut buf[..]).unwrap();
-    /// assert_eq!(String::from_utf8_lossy(&buf), "Dummy<true>");
+    /// assert_eq!(String::from_utf8_lossy(&buf), "Dummy Text");
     ///
     /// // Errors when writing are propagated
+    /// let mut buf: [u8; 0] = [];
     /// assert!(matches!(
     ///     Serializer::to_writer_pretty(&String::from("Hello, there!"), &mut buf[..]),
     ///     Err(serializable::dummy::Error::Write { .. })
@@ -180,10 +182,10 @@ pub trait Serializer {
     /// use serializable::dummy::Serializer;
     /// use serializable::Serializer as _;
     ///
-    /// // The dummy parser can be used for any type implementing `FromStr` and `ToString`
-    /// assert_eq!(Serializer::<u8>::from_str("42").unwrap(), 42);
-    /// assert_eq!(Serializer::<String>::from_str("42").unwrap(), "42");
-    /// assert_eq!(Serializer::<bool>::from_str("true").unwrap(), true);
+    /// // Note: the dummy parser actually doesn't serialize or deserialize, see the features for proper ones
+    /// assert_eq!(Serializer::<u8>::from_str("42").unwrap(), 0);
+    /// assert_eq!(Serializer::<String>::from_str("42").unwrap(), "");
+    /// assert_eq!(Serializer::<bool>::from_str("true").unwrap(), false);
     /// ```
     fn from_str(raw: impl AsRef<str>) -> Result<Self::Target, Self::Error>;
     /// Deserializes the contents of the given reader as a representation for
@@ -206,10 +208,10 @@ pub trait Serializer {
     /// use serializable::dummy::Serializer;
     /// use serializable::Serializer as _;
     ///
-    /// // The dummy parser can be used for any type implementing `FromStr` and `ToString`
-    /// assert_eq!(Serializer::<u8>::from_reader("42".as_bytes()).unwrap(), 42);
-    /// assert_eq!(Serializer::<String>::from_reader("42".as_bytes()).unwrap(), "42");
-    /// assert_eq!(Serializer::<bool>::from_reader("true".as_bytes()).unwrap(), true);
+    /// // Note: the dummy parser actually doesn't serialize or deserialize, see the features for proper ones
+    /// assert_eq!(Serializer::<u8>::from_reader("42".as_bytes()).unwrap(), 0);
+    /// assert_eq!(Serializer::<String>::from_reader("42".as_bytes()).unwrap(), "");
+    /// assert_eq!(Serializer::<bool>::from_reader("true".as_bytes()).unwrap(), false);
     /// ```
     fn from_reader(reader: impl Read) -> Result<Self::Target, Self::Error>;
 }
@@ -244,18 +246,18 @@ where
     /// use serializable::SerializerAsync as _;
     ///
     /// # tokio_test::block_on(async {
-    /// // The dummy parser can be used for any type implementing `FromStr` and `ToString`
+    /// // Note: the dummy parser actually doesn't serialize or deserialize, see the features for proper ones
     /// let mut buf: Vec<u8> = Vec::new();
     /// Serializer::to_writer_async(&42u8, &mut buf).await.unwrap();
-    /// assert_eq!(String::from_utf8_lossy(&buf), "42");
+    /// assert_eq!(String::from_utf8_lossy(&buf), "<dummy_text>");
     ///
     /// let mut buf: Vec<u8> = Vec::new();
     /// Serializer::to_writer_async(&String::from("42"), &mut buf).await.unwrap();
-    /// assert_eq!(String::from_utf8_lossy(&buf), "42");
+    /// assert_eq!(String::from_utf8_lossy(&buf), "<dummy_text>");
     ///
     /// let mut buf: Vec<u8> = Vec::new();
     /// Serializer::to_writer_async(&true, &mut buf).await.unwrap();
-    /// assert_eq!(String::from_utf8_lossy(&buf), "true");
+    /// assert_eq!(String::from_utf8_lossy(&buf), "<dummy_text>");
     /// # });
     /// ```
     async fn to_writer_async(value: &Self::Target, writer: impl Send + std::marker::Unpin + tokio::io::AsyncWrite) -> Result<(), Self::Error>;
@@ -281,18 +283,18 @@ where
     /// use serializable::SerializerAsync as _;
     ///
     /// # tokio_test::block_on(async {
-    /// // The dummy parser can be used for any type implementing `FromStr` and `ToString`
+    /// // Note: the dummy parser actually doesn't serialize or deserialize, see the features for proper ones
     /// let mut buf: Vec<u8> = Vec::new();
     /// Serializer::to_writer_pretty_async(&42u8, &mut buf).await.unwrap();
-    /// assert_eq!(String::from_utf8_lossy(&buf), "Dummy<42>");
+    /// assert_eq!(String::from_utf8_lossy(&buf), "Dummy Text");
     ///
     /// let mut buf: Vec<u8> = Vec::new();
     /// Serializer::to_writer_pretty_async(&String::from("42"), &mut buf).await.unwrap();
-    /// assert_eq!(String::from_utf8_lossy(&buf), "Dummy<42>");
+    /// assert_eq!(String::from_utf8_lossy(&buf), "Dummy Text");
     ///
     /// let mut buf: Vec<u8> = Vec::new();
     /// Serializer::to_writer_pretty_async(&true, &mut buf).await.unwrap();
-    /// assert_eq!(String::from_utf8_lossy(&buf), "Dummy<true>");
+    /// assert_eq!(String::from_utf8_lossy(&buf), "Dummy Text");
     /// # });
     /// ```
     #[inline]
@@ -321,10 +323,10 @@ where
     /// use serializable::SerializerAsync as _;
     ///
     /// # tokio_test::block_on(async {
-    /// // The dummy parser can be used for any type implementing `FromStr` and `ToString`
-    /// assert_eq!(Serializer::<u8>::from_reader_async("42".as_bytes()).await.unwrap(), 42);
-    /// assert_eq!(Serializer::<String>::from_reader_async("42".as_bytes()).await.unwrap(), "42");
-    /// assert_eq!(Serializer::<bool>::from_reader_async("true".as_bytes()).await.unwrap(), true);
+    /// // Note: the dummy parser actually doesn't serialize or deserialize, see the features for proper ones
+    /// assert_eq!(Serializer::<u8>::from_reader_async("42".as_bytes()).await.unwrap(), 0);
+    /// assert_eq!(Serializer::<String>::from_reader_async("42".as_bytes()).await.unwrap(), "");
+    /// assert_eq!(Serializer::<bool>::from_reader_async("true".as_bytes()).await.unwrap(), false);
     /// # });
     /// ```
     async fn from_reader_async(reader: impl Send + std::marker::Unpin + tokio::io::AsyncRead) -> Result<Self::Target, Self::Error>;

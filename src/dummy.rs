@@ -4,7 +4,7 @@
 //  Created:
 //    29 Oct 2023, 11:59:19
 //  Last edited:
-//    29 Oct 2023, 17:38:22
+//    29 Oct 2023, 17:56:03
 //  Auto updated?
 //    Yes
 //
@@ -16,8 +16,6 @@
 use std::error;
 use std::fmt::{Debug, Display, Formatter, Result as FResult};
 use std::marker::PhantomData;
-use std::str::FromStr;
-use std::string::ToString;
 
 use crate::serializer;
 
@@ -25,31 +23,27 @@ use crate::serializer;
 /***** ERRORS *****/
 /// Defines errors that occur when using the dummy [`Serializer`].
 #[derive(Debug)]
-pub enum Error<E> {
+pub enum Error {
     /// Failed to write to the given writer.
     Write { err: std::io::Error },
     /// Failed to read from the given reader.
     Read { err: std::io::Error },
-    /// Failed to deserialize the given type.
-    Deserialize { err: E },
 }
-impl<E: Display> Display for Error<E> {
+impl Display for Error {
     fn fmt(&self, f: &mut Formatter<'_>) -> FResult {
         use Error::*;
         match self {
             Write { .. } => write!(f, "Failed to write to given writer"),
             Read { .. } => write!(f, "Failed to read from given reader"),
-            Deserialize { .. } => write!(f, "Failed to deserialize as FromStr"),
         }
     }
 }
-impl<E: 'static + error::Error> error::Error for Error<E> {
+impl error::Error for Error {
     fn source(&self) -> Option<&(dyn error::Error + 'static)> {
         use Error::*;
         match self {
             Write { err } => Some(err),
             Read { err } => Some(err),
-            Deserialize { err } => Some(err),
         }
     }
 }
@@ -59,7 +53,7 @@ impl<E: 'static + error::Error> error::Error for Error<E> {
 
 
 /***** LIBRARY *****/
-/// Defines a dummy serializer that serializes naively using a type's [`ToString`]-implementation for serialization, and [`FromStr`] for deserialization.
+/// Defines a dummy serializer that serializes to a constant value and "deserializes" by calling the target's [`Default`]-implementation.
 ///
 /// Mostly used in examples and (doc)tests.
 ///
@@ -68,24 +62,10 @@ impl<E: 'static + error::Error> error::Error for Error<E> {
 /// use serializable::dummy::Serializer;
 /// use serializable::Serializable;
 ///
-/// #[derive(Debug, Eq, PartialEq)]
+/// #[derive(Debug, Default, Eq, PartialEq)]
 /// struct HelloWorld {
 ///     hello: String,
 ///     world: String,
-/// }
-/// impl std::str::FromStr for HelloWorld {
-///     type Err = std::convert::Infallible;
-///
-///     fn from_str(value: &str) -> Result<Self, Self::Err> {
-///         if let Some(pos) = value.find(',') {
-///             Ok(Self { hello: value[..pos].into(), world: value[pos + 1..].into() })
-///         } else {
-///             Ok(Self { hello: value.into(), world: "".into() })
-///         }
-///     }
-/// }
-/// impl ToString for HelloWorld {
-///     fn to_string(&self) -> String { format!("{},{}", self.hello, self.world) }
 /// }
 /// impl Serializable<Serializer<HelloWorld>> for HelloWorld {}
 ///
@@ -95,24 +75,24 @@ impl<E: 'static + error::Error> error::Error for Error<E> {
 ///         world: "World".into(),
 ///     })
 ///     .unwrap(),
-///     "Hello,World"
+///     "<dummy_text>"
 /// );
 ///
-/// assert_eq!(HelloWorld::from_str("Goodbye,Planet").unwrap(), HelloWorld {
-///     hello: "Goodbye".into(),
-///     world: "Planet".into(),
+/// assert_eq!(HelloWorld::from_str("<dummy_text>").unwrap(), HelloWorld {
+///     hello: "".into(),
+///     world: "".into(),
 /// })
 /// ```
 #[derive(Clone, Copy, Debug)]
 pub struct Serializer<T>(PhantomData<T>);
 
-impl<T: FromStr<Err = E> + ToString, E: 'static + error::Error> serializer::Serializer for Serializer<T> {
-    type Error = Error<E>;
+impl<T: Default> serializer::Serializer for Serializer<T> {
+    type Error = Error;
     type Target = T;
 
-    fn to_string(value: &Self::Target) -> Result<String, Self::Error> { Ok(value.to_string()) }
+    fn to_string(_value: &Self::Target) -> Result<String, Self::Error> { Ok("<dummy_text>".into()) }
 
-    fn to_string_pretty(value: &Self::Target) -> Result<String, Self::Error> { Ok(format!("Dummy<{}>", value.to_string())) }
+    fn to_string_pretty(_value: &Self::Target) -> Result<String, Self::Error> { Ok("Dummy Text".into()) }
 
     fn to_writer(value: &Self::Target, mut writer: impl std::io::Write) -> Result<(), Self::Error> {
         writer.write_all(Self::to_string(value)?.as_bytes()).map_err(|err| Error::Write { err })
@@ -122,9 +102,7 @@ impl<T: FromStr<Err = E> + ToString, E: 'static + error::Error> serializer::Seri
         writer.write_all(Self::to_string_pretty(value)?.as_bytes()).map_err(|err| Error::Write { err })
     }
 
-    fn from_str(raw: impl AsRef<str>) -> Result<Self::Target, Self::Error> {
-        Self::Target::from_str(raw.as_ref()).map_err(|err| Error::Deserialize { err })
-    }
+    fn from_str(_raw: impl AsRef<str>) -> Result<Self::Target, Self::Error> { Ok(Self::Target::default()) }
 
     fn from_reader(mut reader: impl std::io::Read) -> Result<Self::Target, Self::Error> {
         // Read from the reader first...
@@ -140,7 +118,7 @@ impl<T: FromStr<Err = E> + ToString, E: 'static + error::Error> serializer::Seri
 
 #[cfg(feature = "async-tokio")]
 #[async_trait::async_trait]
-impl<T: Send + Sync + FromStr<Err = E> + ToString, E: 'static + Send + error::Error> serializer::SerializerAsync for Serializer<T> {
+impl<T: Send + Sync + Default> serializer::SerializerAsync for Serializer<T> {
     async fn to_writer_async(value: &Self::Target, mut writer: impl Send + std::marker::Unpin + tokio::io::AsyncWrite) -> Result<(), Self::Error> {
         use tokio::io::AsyncWriteExt as _;
         writer.write_all(<Self as serializer::Serializer>::to_string(value)?.as_bytes()).await.map_err(|err| Error::Write { err })
