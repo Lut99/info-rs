@@ -4,7 +4,7 @@
 //  Created:
 //    29 Oct 2023, 11:59:19
 //  Last edited:
-//    29 Oct 2023, 17:56:03
+//    30 Oct 2023, 12:30:22
 //  Auto updated?
 //    Yes
 //
@@ -28,6 +28,9 @@ pub enum Error {
     Write { err: std::io::Error },
     /// Failed to read from the given reader.
     Read { err: std::io::Error },
+    /// Failed to flush the given reader.
+    #[cfg(feature = "async-tokio")]
+    Flush { err: std::io::Error },
 }
 impl Display for Error {
     fn fmt(&self, f: &mut Formatter<'_>) -> FResult {
@@ -35,6 +38,8 @@ impl Display for Error {
         match self {
             Write { .. } => write!(f, "Failed to write to given writer"),
             Read { .. } => write!(f, "Failed to read from given reader"),
+            #[cfg(feature = "async-tokio")]
+            Flush { .. } => write!(f, "Failed to flush the given writer"),
         }
     }
 }
@@ -44,6 +49,8 @@ impl error::Error for Error {
         match self {
             Write { err } => Some(err),
             Read { err } => Some(err),
+            #[cfg(feature = "async-tokio")]
+            Flush { err } => Some(err),
         }
     }
 }
@@ -121,7 +128,8 @@ impl<T: Default> serializer::Serializer for Serializer<T> {
 impl<T: Send + Sync + Default> serializer::SerializerAsync for Serializer<T> {
     async fn to_writer_async(value: &Self::Target, mut writer: impl Send + std::marker::Unpin + tokio::io::AsyncWrite) -> Result<(), Self::Error> {
         use tokio::io::AsyncWriteExt as _;
-        writer.write_all(<Self as serializer::Serializer>::to_string(value)?.as_bytes()).await.map_err(|err| Error::Write { err })
+        writer.write_all(<Self as serializer::Serializer>::to_string(value)?.as_bytes()).await.map_err(|err| Error::Write { err })?;
+        writer.flush().await.map_err(|err| Error::Flush { err })
     }
 
     async fn to_writer_pretty_async(
@@ -129,7 +137,8 @@ impl<T: Send + Sync + Default> serializer::SerializerAsync for Serializer<T> {
         mut writer: impl Send + std::marker::Unpin + tokio::io::AsyncWrite,
     ) -> Result<(), Self::Error> {
         use tokio::io::AsyncWriteExt as _;
-        writer.write_all(<Self as serializer::Serializer>::to_string_pretty(value)?.as_bytes()).await.map_err(|err| Error::Write { err })
+        writer.write_all(<Self as serializer::Serializer>::to_string_pretty(value)?.as_bytes()).await.map_err(|err| Error::Write { err })?;
+        writer.flush().await.map_err(|err| Error::Flush { err })
     }
 
     async fn from_reader_async(mut reader: impl Send + std::marker::Unpin + tokio::io::AsyncRead) -> Result<Self::Target, Self::Error> {

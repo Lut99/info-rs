@@ -4,7 +4,7 @@
 //  Created:
 //    28 Oct 2023, 11:28:42
 //  Last edited:
-//    30 Oct 2023, 10:54:30
+//    30 Oct 2023, 12:28:53
 //  Auto updated?
 //    Yes
 //
@@ -35,6 +35,9 @@ pub enum Error<E> {
     FileCreate { path: PathBuf, err: std::io::Error },
     /// Failed to open a new file.
     FileOpen { path: PathBuf, err: std::io::Error },
+    /// Failed to flush the given file.
+    #[cfg(feature = "async-tokio")]
+    FileFlush { path: PathBuf, err: std::io::Error },
 
     /// Failed to serialize the type to a string.
     SerializeString { what: &'static str, err: E },
@@ -56,6 +59,8 @@ impl<E: Display> Display for Error<E> {
         match self {
             FileCreate { path, .. } => write!(f, "Failed to create output file '{}'", path.display()),
             FileOpen { path, .. } => write!(f, "Failed to open input file '{}'", path.display()),
+            #[cfg(feature = "async-tokio")]
+            FileFlush { path, .. } => write!(f, "Failed to flush output file '{}'", path.display()),
 
             SerializeString { what, .. } => write!(f, "Failed to serialize {what} to a string"),
             SerializeWriter { what, .. } => {
@@ -81,6 +86,8 @@ impl<E: 'static + error::Error> error::Error for Error<E> {
         match self {
             FileCreate { err, .. } => Some(err),
             FileOpen { err, .. } => Some(err),
+            #[cfg(feature = "async-tokio")]
+            FileFlush { err, .. } => Some(err),
 
             SerializeString { err, .. } => Some(err),
             SerializeWriter { err, .. } => Some(err),
@@ -117,10 +124,7 @@ impl<E: 'static + error::Error> error::Error for Error<E> {
 ///     HelloWorld { hello: "Hello".into(), world: "World".into() }.to_string().unwrap(),
 ///     "<dummy_text>"
 /// );
-/// assert_eq!(HelloWorld::from_str("<dummy_text>").unwrap(), HelloWorld {
-///     hello: "".into(),
-///     world: "".into(),
-/// });
+/// assert_eq!(HelloWorld::from_str("<dummy_text>").unwrap(), HelloWorld::default());
 /// ```
 pub trait Serializable<T: Serializer<Target = Self>> {
     // Serializer backend aliases
@@ -138,7 +142,7 @@ pub trait Serializable<T: Serializer<Target = Self>> {
     /// use serializable::dummy::Serializer;
     /// use serializable::Serializable;
     ///
-    /// #[derive(Debug, Default, Eq, PartialEq)]
+    /// #[derive(Default)]
     /// struct HelloWorld {
     ///     hello: String,
     ///     world: String,
@@ -174,7 +178,7 @@ pub trait Serializable<T: Serializer<Target = Self>> {
     /// use serializable::dummy::Serializer;
     /// use serializable::Serializable;
     ///
-    /// #[derive(Debug, Default, Eq, PartialEq)]
+    /// #[derive(Default)]
     /// struct HelloWorld {
     ///     hello: String,
     ///     world: String,
@@ -207,7 +211,7 @@ pub trait Serializable<T: Serializer<Target = Self>> {
     /// use serializable::dummy::Serializer;
     /// use serializable::Serializable;
     ///
-    /// #[derive(Debug, Default, Eq, PartialEq)]
+    /// #[derive(Default)]
     /// struct HelloWorld {
     ///     hello: String,
     ///     world: String,
@@ -249,7 +253,7 @@ pub trait Serializable<T: Serializer<Target = Self>> {
     /// use serializable::dummy::Serializer;
     /// use serializable::Serializable;
     ///
-    /// #[derive(Debug, Default, Eq, PartialEq)]
+    /// #[derive(Default)]
     /// struct HelloWorld {
     ///     hello: String,
     ///     world: String,
@@ -285,6 +289,22 @@ pub trait Serializable<T: Serializer<Target = Self>> {
     /// This function may error with an [`Error::DeserializeString`] if the
     /// backend deserializer failed to deserialize. This may be because the
     /// serialized representation was illegal for this type and backend.
+    ///
+    /// # Examples
+    /// ```rust
+    /// use serializable::dummy::Serializer;
+    /// use serializable::Serializable;
+    ///
+    /// #[derive(Debug, Default, Eq, PartialEq)]
+    /// struct HelloWorld {
+    ///     hello: String,
+    ///     world: String,
+    /// }
+    /// impl Serializable<Serializer<HelloWorld>> for HelloWorld {}
+    ///
+    /// // Note: the dummy serializer doesn't actually serialize/deserialize any content. Check the features for proper ones!
+    /// assert_eq!(HelloWorld::from_str("<dummy_text>").unwrap(), HelloWorld::default());
+    /// ```
     #[inline]
     fn from_str(raw: impl AsRef<str>) -> Result<Self, Error<T::Error>>
     where
@@ -310,6 +330,22 @@ pub trait Serializable<T: Serializer<Target = Self>> {
     /// backend deserializer failed to deserialize. This may be because the
     /// backend failed to read from the given `reader`, or because the
     /// serialized representation was illegal for this type and backend.
+    ///
+    /// # Examples
+    /// ```rust
+    /// use serializable::dummy::Serializer;
+    /// use serializable::Serializable;
+    ///
+    /// #[derive(Debug, Default, Eq, PartialEq)]
+    /// struct HelloWorld {
+    ///     hello: String,
+    ///     world: String,
+    /// }
+    /// impl Serializable<Serializer<HelloWorld>> for HelloWorld {}
+    ///
+    /// // Note: the dummy serializer doesn't actually serialize/deserialize any content. Check the features for proper ones!
+    /// assert_eq!(HelloWorld::from_reader("<dummy_text>".as_bytes()).unwrap(), HelloWorld::default());
+    /// ```
     #[inline]
     fn from_reader(reader: impl Read) -> Result<Self, Error<T::Error>>
     where
@@ -334,6 +370,25 @@ pub trait Serializable<T: Serializer<Target = Self>> {
     /// create a new file, or an [`Error::SerializeFile`] if the
     /// backend serializer failed to serialize. This may also be because it
     /// failed to write to the file.
+    ///
+    /// # Examples
+    /// ```rust
+    /// # use std::path::PathBuf;
+    /// use serializable::dummy::Serializer;
+    /// use serializable::Serializable;
+    ///
+    /// #[derive(Default)]
+    /// struct HelloWorld {
+    ///     hello: String,
+    ///     world: String,
+    /// }
+    /// impl Serializable<Serializer<HelloWorld>> for HelloWorld {}
+    ///
+    /// // Note: the dummy serializer doesn't actually serialize/deserialize any content. Check the features for proper ones!
+    /// let path: PathBuf = std::env::temp_dir().join("test.txt");
+    /// HelloWorld { hello: "Hello".into(), world: "World".into() }.to_path(&path).unwrap();
+    /// assert_eq!(std::fs::read_to_string(path).unwrap(), "<dummy_text>");
+    /// ```
     #[inline]
     fn to_path(&self, path: impl AsRef<Path>) -> Result<(), Error<T::Error>> {
         // Open the file as a writer
@@ -365,6 +420,25 @@ pub trait Serializable<T: Serializer<Target = Self>> {
     /// create a new file, or an [`Error::SerializeFile`] if the
     /// backend serializer failed to serialize. This may also be because it
     /// failed to write to the file.
+    ///
+    /// # Examples
+    /// ```rust
+    /// # use std::path::PathBuf;
+    /// use serializable::dummy::Serializer;
+    /// use serializable::Serializable;
+    ///
+    /// #[derive(Default)]
+    /// struct HelloWorld {
+    ///     hello: String,
+    ///     world: String,
+    /// }
+    /// impl Serializable<Serializer<HelloWorld>> for HelloWorld {}
+    ///
+    /// // Note: the dummy serializer doesn't actually serialize/deserialize any content. Check the features for proper ones!
+    /// let path: PathBuf = std::env::temp_dir().join("test.txt");
+    /// HelloWorld { hello: "Hello".into(), world: "World".into() }.to_path_pretty(&path).unwrap();
+    /// assert_eq!(std::fs::read_to_string(path).unwrap(), "Dummy Text");
+    /// ```
     #[inline]
     fn to_path_pretty(&self, path: impl AsRef<Path>) -> Result<(), Error<T::Error>> {
         // Open the file as a writer
@@ -396,6 +470,25 @@ pub trait Serializable<T: Serializer<Target = Self>> {
     /// create a new file, or an [`Error::DeserializeFile`] if the
     /// backend serializer failed to serialize. This may also be because it
     /// failed to write to the file.
+    ///
+    /// # Examples
+    /// ```rust
+    /// # use std::path::PathBuf;
+    /// use serializable::dummy::Serializer;
+    /// use serializable::Serializable;
+    ///
+    /// #[derive(Debug, Default, Eq, PartialEq)]
+    /// struct HelloWorld {
+    ///     hello: String,
+    ///     world: String,
+    /// }
+    /// impl Serializable<Serializer<HelloWorld>> for HelloWorld {}
+    ///
+    /// // Note: the dummy serializer doesn't actually serialize/deserialize any content. Check the features for proper ones!
+    /// let path: PathBuf = std::env::temp_dir().join("test.txt");
+    /// std::fs::write(&path, "<dummy_text>").unwrap();
+    /// assert_eq!(HelloWorld::from_path(path).unwrap(), HelloWorld::default());
+    /// ```
     #[inline]
     fn from_path(path: impl AsRef<Path>) -> Result<Self, Error<T::Error>>
     where
@@ -430,6 +523,27 @@ pub trait Serializable<T: Serializer<Target = Self>> {
     /// # Errors
     /// This function may error with an [`Error::SerializeString`] if the
     /// backend serializer failed to serialize.
+    ///
+    /// # Examples
+    /// ```rust
+    /// use serializable::dummy::Serializer;
+    /// use serializable::Serializable;
+    ///
+    /// #[derive(Default)]
+    /// struct HelloWorld {
+    ///     hello: String,
+    ///     world: String,
+    /// }
+    /// impl Serializable<Serializer<HelloWorld>> for HelloWorld {}
+    ///
+    /// // Note: the dummy serializer doesn't actually serialize/deserialize any content. Check the features for proper ones!
+    /// fn to_string(hello_world: HelloWorld, pretty: bool) -> String {
+    ///     hello_world.to_string_pretty_opt(pretty).unwrap()
+    /// }
+    ///
+    /// assert_eq!(to_string(HelloWorld { hello: "Hello".into(), world: "World".into() }, false), "<dummy_text>");
+    /// assert_eq!(to_string(HelloWorld { hello: "Hello".into(), world: "World".into() }, true), "Dummy Text");
+    /// ```
     #[inline]
     fn to_string_pretty_opt(&self, pretty: bool) -> Result<String, Error<T::Error>> {
         if pretty { self.to_string_pretty() } else { self.to_string() }
@@ -445,6 +559,37 @@ pub trait Serializable<T: Serializer<Target = Self>> {
     /// This function may error with an [`Error::SerializeWriter`] if the
     /// backend serializer failed to serialize. This may also be because it
     /// failed to write to the `writer`.
+    ///
+    /// # Examples
+    /// ```rust
+    /// # use std::io::Write;
+    /// use serializable::dummy::Serializer;
+    /// use serializable::Serializable;
+    ///
+    /// #[derive(Default)]
+    /// struct HelloWorld {
+    ///     hello: String,
+    ///     world: String,
+    /// }
+    /// impl Serializable<Serializer<HelloWorld>> for HelloWorld {}
+    ///
+    /// // Note: the dummy serializer doesn't actually serialize/deserialize any content. Check the features for proper ones!
+    /// fn to_writer(hello_world: HelloWorld, writer: impl Write, pretty: bool) -> Result<(), serializable::Error<serializable::dummy::Error>> {
+    ///     hello_world.to_writer_pretty_opt(writer, pretty)
+    /// }
+    ///
+    /// let mut buf: [u8; 12] = [0; 12];
+    /// to_writer(HelloWorld { hello: "Hello".into(), world: "World".into() }, &mut buf[..], false).unwrap();
+    /// assert_eq!(String::from_utf8_lossy(&buf), "<dummy_text>");
+    ///
+    /// let mut buf: [u8; 10] = [0; 10];
+    /// to_writer(HelloWorld { hello: "Hello".into(), world: "World".into() }, &mut buf[..], true).unwrap();
+    /// assert_eq!(String::from_utf8_lossy(&buf), "Dummy Text");
+    ///
+    /// let mut buf: [u8; 0] = [];
+    /// assert!(matches!(to_writer(HelloWorld { hello: "Hello".into(), world: "World".into() }, &mut buf[..], false), Err(serializable::Error::SerializeWriter { .. })));
+    /// assert!(matches!(to_writer(HelloWorld { hello: "Hello".into(), world: "World".into() }, &mut buf[..], true), Err(serializable::Error::SerializeWriter { .. })));
+    /// ```
     #[inline]
     fn to_writer_pretty_opt(&self, writer: impl Write, pretty: bool) -> Result<(), Error<T::Error>> {
         if pretty { self.to_writer_pretty(writer) } else { self.to_writer(writer) }
@@ -461,6 +606,30 @@ pub trait Serializable<T: Serializer<Target = Self>> {
     /// create a new file, or an [`Error::SerializeFile`] if the
     /// backend serializer failed to serialize. This may also be because it
     /// failed to write to the file.
+    ///
+    /// # Examples
+    /// ```rust
+    /// # use std::path::PathBuf;
+    /// use serializable::dummy::Serializer;
+    /// use serializable::Serializable;
+    ///
+    /// #[derive(Default)]
+    /// struct HelloWorld {
+    ///     hello: String,
+    ///     world: String,
+    /// }
+    /// impl Serializable<Serializer<HelloWorld>> for HelloWorld {}
+    ///
+    /// // Note: the dummy serializer doesn't actually serialize/deserialize any content. Check the features for proper ones!
+    /// fn to_path(hello_world: HelloWorld, pretty: bool) -> String {
+    ///     let path: PathBuf = std::env::temp_dir().join(format!("test_{}.txt", if pretty { "pretty" } else { "ugly" }));
+    ///     hello_world.to_path_pretty_opt(&path, pretty).unwrap();
+    ///     std::fs::read_to_string(path).unwrap()
+    /// }
+    ///
+    /// assert_eq!(to_path(HelloWorld { hello: "Hello".into(), world: "World".into() }, false), "<dummy_text>");
+    /// assert_eq!(to_path(HelloWorld { hello: "Hello".into(), world: "World".into() }, true), "Dummy Text");
+    /// ```
     #[inline]
     fn to_path_pretty_opt(&self, path: impl AsRef<Path>, pretty: bool) -> Result<(), Error<T::Error>> {
         if pretty { self.to_path_pretty(path) } else { self.to_path(path) }
@@ -498,10 +667,7 @@ pub trait Serializable<T: Serializer<Target = Self>> {
 /// );
 ///
 /// let mut buf: Vec<u8> = (*b"<dummy_text>").into();
-/// assert_eq!(HelloWorld::from_reader_async(&buf[..]).await.unwrap(), HelloWorld {
-///     hello: "".into(),
-///     world: "".into(),
-/// });
+/// assert_eq!(HelloWorld::from_reader_async(&buf[..]).await.unwrap(), HelloWorld::default());
 /// # });
 /// ```
 #[cfg(feature = "async-tokio")]
@@ -519,6 +685,26 @@ where
     /// This function may error with an [`Error::SerializeWriter`] if the
     /// backend serializer failed to serialize. This may also be because it
     /// failed to write to the `writer`.
+    ///
+    /// # Examples
+    /// ```rust
+    /// use serializable::dummy::Serializer;
+    /// use serializable::{Serializable, SerializableAsync as _};
+    ///
+    /// #[derive(Default)]
+    /// struct HelloWorld {
+    ///     hello: String,
+    ///     world: String,
+    /// }
+    /// impl Serializable<Serializer<HelloWorld>> for HelloWorld {}
+    ///
+    /// # tokio_test::block_on(async {
+    /// // Note: the dummy serializer doesn't actually serialize/deserialize any content. Check the features for proper ones!
+    /// let mut buf: Vec<u8> = Vec::new();
+    /// HelloWorld { hello: "Hello".into(), world: "World".into() }.to_writer_async(&mut buf).await.unwrap();
+    /// assert_eq!(String::from_utf8_lossy(&buf), "<dummy_text>");
+    /// # });
+    /// ```
     #[inline]
     async fn to_writer_async(&self, writer: impl Send + std::marker::Unpin + tokio::io::AsyncWrite) -> Result<(), Error<T::Error>> {
         match T::to_writer_async(self, writer).await {
@@ -540,6 +726,26 @@ where
     /// This function may error with an [`Error::SerializeWriter`] if the
     /// backend serializer failed to serialize. This may also be because it
     /// failed to write to the `writer`.
+    ///
+    /// # Examples
+    /// ```rust
+    /// use serializable::dummy::Serializer;
+    /// use serializable::{Serializable, SerializableAsync as _};
+    ///
+    /// #[derive(Default)]
+    /// struct HelloWorld {
+    ///     hello: String,
+    ///     world: String,
+    /// }
+    /// impl Serializable<Serializer<HelloWorld>> for HelloWorld {}
+    ///
+    /// # tokio_test::block_on(async {
+    /// // Note: the dummy serializer doesn't actually serialize/deserialize any content. Check the features for proper ones!
+    /// let mut buf: Vec<u8> = Vec::new();
+    /// HelloWorld { hello: "Hello".into(), world: "World".into() }.to_writer_pretty_async(&mut buf).await.unwrap();
+    /// assert_eq!(String::from_utf8_lossy(&buf), "Dummy Text");
+    /// # });
+    /// ```
     #[inline]
     async fn to_writer_pretty_async(&self, writer: impl Send + std::marker::Unpin + tokio::io::AsyncWrite) -> Result<(), Error<T::Error>> {
         match T::to_writer_pretty_async(self, writer).await {
@@ -562,6 +768,24 @@ where
     /// backend deserializer failed to deserialize. This may be because the
     /// backend failed to read from the given `reader`, or because the
     /// serialized representation was illegal for this type and backend.
+    ///
+    /// # Examples
+    /// ```rust
+    /// use serializable::dummy::Serializer;
+    /// use serializable::{Serializable, SerializableAsync as _};
+    ///
+    /// #[derive(Debug, Default, Eq, PartialEq)]
+    /// struct HelloWorld {
+    ///     hello: String,
+    ///     world: String,
+    /// }
+    /// impl Serializable<Serializer<HelloWorld>> for HelloWorld {}
+    ///
+    /// # tokio_test::block_on(async {
+    /// // Note: the dummy serializer doesn't actually serialize/deserialize any content. Check the features for proper ones!
+    /// assert_eq!(HelloWorld::from_reader_async("<dummy_text>".as_bytes()).await.unwrap(), HelloWorld::default());
+    /// # });
+    /// ```
     #[inline]
     async fn from_reader_async(reader: impl Send + std::marker::Unpin + tokio::io::AsyncRead) -> Result<Self, Error<T::Error>>
     where
@@ -586,11 +810,32 @@ where
     /// create a new file, or an [`Error::SerializeFile`] if the
     /// backend serializer failed to serialize. This may also be because it
     /// failed to write to the file.
+    ///
+    /// # Examples
+    /// ```rust
+    /// # use std::path::PathBuf;
+    /// use serializable::dummy::Serializer;
+    /// use serializable::{Serializable, SerializableAsync as _};
+    ///
+    /// #[derive(Default)]
+    /// struct HelloWorld {
+    ///     hello: String,
+    ///     world: String,
+    /// }
+    /// impl Serializable<Serializer<HelloWorld>> for HelloWorld {}
+    ///
+    /// # tokio_test::block_on(async {
+    /// // Note: the dummy serializer doesn't actually serialize/deserialize any content. Check the features for proper ones!
+    /// let path: PathBuf = std::env::temp_dir().join("test.txt");
+    /// HelloWorld { hello: "Hello".into(), world: "World".into() }.to_path_async(&path).await.unwrap();
+    /// assert_eq!(tokio::fs::read_to_string(path).await.unwrap(), "<dummy_text>");
+    /// # });
+    /// ```
     #[inline]
     async fn to_path_async(&self, path: impl Send + AsRef<Path>) -> Result<(), Error<T::Error>> {
         // Open the file as a writer
         let path: &Path = path.as_ref();
-        let handle: tokio::fs::File = match tokio::fs::File::create(path).await {
+        let mut handle: tokio::fs::File = match tokio::fs::File::create(path).await {
             Ok(handle) => handle,
             Err(err) => {
                 return Err(Error::FileCreate { path: path.into(), err });
@@ -598,7 +843,7 @@ where
         };
 
         // Pass to the writer impl
-        match self.to_writer_async(handle).await {
+        match self.to_writer_async(&mut handle).await {
             Ok(_) => Ok(()),
             Err(Error::SerializeWriter { what, err }) => Err(Error::SerializeFile { what, path: path.into(), err }),
             Err(err) => Err(err),
@@ -617,6 +862,27 @@ where
     /// create a new file, or an [`Error::SerializeFile`] if the
     /// backend serializer failed to serialize. This may also be because it
     /// failed to write to the file.
+    ///
+    /// # Examples
+    /// ```rust
+    /// # use std::path::PathBuf;
+    /// use serializable::dummy::Serializer;
+    /// use serializable::{Serializable, SerializableAsync as _};
+    ///
+    /// #[derive(Default)]
+    /// struct HelloWorld {
+    ///     hello: String,
+    ///     world: String,
+    /// }
+    /// impl Serializable<Serializer<HelloWorld>> for HelloWorld {}
+    ///
+    /// # tokio_test::block_on(async {
+    /// // Note: the dummy serializer doesn't actually serialize/deserialize any content. Check the features for proper ones!
+    /// let path: PathBuf = std::env::temp_dir().join("test.txt");
+    /// HelloWorld { hello: "Hello".into(), world: "World".into() }.to_path_pretty_async(&path).await.unwrap();
+    /// assert_eq!(tokio::fs::read_to_string(path).await.unwrap(), "Dummy Text");
+    /// # });
+    /// ```
     #[inline]
     async fn to_path_pretty_async(&self, path: impl Send + AsRef<Path>) -> Result<(), Error<T::Error>> {
         // Open the file as a writer
@@ -648,6 +914,27 @@ where
     /// create a new file, or an [`Error::DeserializeFile`] if the
     /// backend serializer failed to serialize. This may also be because it
     /// failed to write to the file.
+    ///
+    /// # Examples
+    /// ```rust
+    /// # use std::path::PathBuf;
+    /// use serializable::dummy::Serializer;
+    /// use serializable::{Serializable, SerializableAsync as _};
+    ///
+    /// #[derive(Debug, Default, Eq, PartialEq)]
+    /// struct HelloWorld {
+    ///     hello: String,
+    ///     world: String,
+    /// }
+    /// impl Serializable<Serializer<HelloWorld>> for HelloWorld {}
+    ///
+    /// # tokio_test::block_on(async {
+    /// // Note: the dummy serializer doesn't actually serialize/deserialize any content. Check the features for proper ones!
+    /// let path: PathBuf = std::env::temp_dir().join("test.txt");
+    /// tokio::fs::write(&path, "<dummy_text>").await.unwrap();
+    /// assert_eq!(HelloWorld::from_path_async(path).await.unwrap(), HelloWorld::default());
+    /// # });
+    /// ```
     #[inline]
     async fn from_path_async(path: impl Send + AsRef<Path>) -> Result<Self, Error<T::Error>>
     where
@@ -681,6 +968,37 @@ where
     /// This function may error with an [`Error::SerializeWriter`] if the
     /// backend serializer failed to serialize. This may also be because it
     /// failed to write to the `writer`.
+    ///
+    /// # Examples
+    /// ```rust
+    /// # use std::io::Write;
+    /// # use std::marker::Unpin;
+    /// # use tokio::io::AsyncWrite;
+    /// use serializable::dummy::Serializer;
+    /// use serializable::{Serializable, SerializableAsync as _};
+    ///
+    /// #[derive(Default)]
+    /// struct HelloWorld {
+    ///     hello: String,
+    ///     world: String,
+    /// }
+    /// impl Serializable<Serializer<HelloWorld>> for HelloWorld {}
+    ///
+    /// // Note: the dummy serializer doesn't actually serialize/deserialize any content. Check the features for proper ones!
+    /// async fn to_writer_async(hello_world: HelloWorld, writer: impl Send + Unpin + AsyncWrite, pretty: bool) -> Result<(), serializable::Error<serializable::dummy::Error>> {
+    ///     hello_world.to_writer_pretty_opt_async(writer, pretty).await
+    /// }
+    ///
+    /// # tokio_test::block_on(async {
+    /// let mut buf: Vec<u8> = Vec::new();
+    /// to_writer_async(HelloWorld { hello: "Hello".into(), world: "World".into() }, &mut buf, false).await.unwrap();
+    /// assert_eq!(String::from_utf8_lossy(&buf), "<dummy_text>");
+    ///
+    /// let mut buf: Vec<u8> = Vec::new();
+    /// to_writer_async(HelloWorld { hello: "Hello".into(), world: "World".into() }, &mut buf, true).await.unwrap();
+    /// assert_eq!(String::from_utf8_lossy(&buf), "Dummy Text");
+    /// # });
+    /// ```
     #[inline]
     async fn to_writer_pretty_opt_async(
         &self,
@@ -701,8 +1019,34 @@ where
     /// create a new file, or an [`Error::SerializeFile`] if the
     /// backend serializer failed to serialize. This may also be because it
     /// failed to write to the file.
+    ///
+    /// # Examples
+    /// ```rust
+    /// # use std::path::PathBuf;
+    /// use serializable::dummy::Serializer;
+    /// use serializable::{Serializable, SerializableAsync as _};
+    ///
+    /// #[derive(Default)]
+    /// struct HelloWorld {
+    ///     hello: String,
+    ///     world: String,
+    /// }
+    /// impl Serializable<Serializer<HelloWorld>> for HelloWorld {}
+    ///
+    /// // Note: the dummy serializer doesn't actually serialize/deserialize any content. Check the features for proper ones!
+    /// async fn to_path_async(hello_world: HelloWorld, pretty: bool) -> String {
+    ///     let path: PathBuf = std::env::temp_dir().join(format!("test_{}.txt", if pretty { "pretty" } else { "ugly" }));
+    ///     hello_world.to_path_pretty_opt_async(&path, pretty).await.unwrap();
+    ///     tokio::fs::read_to_string(path).await.unwrap()
+    /// }
+    ///
+    /// # tokio_test::block_on(async {
+    /// assert_eq!(to_path_async(HelloWorld { hello: "Hello".into(), world: "World".into() }, false).await, "<dummy_text>");
+    /// assert_eq!(to_path_async(HelloWorld { hello: "Hello".into(), world: "World".into() }, true).await, "Dummy Text");
+    /// # });
+    /// ```
     #[inline]
-    async fn to_path_pretty_opt(&self, path: impl Send + AsRef<Path>, pretty: bool) -> Result<(), Error<T::Error>> {
+    async fn to_path_pretty_opt_async(&self, path: impl Send + AsRef<Path>, pretty: bool) -> Result<(), Error<T::Error>> {
         if pretty { self.to_path_pretty_async(path).await } else { self.to_path_async(path).await }
     }
 }

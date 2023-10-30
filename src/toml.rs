@@ -4,7 +4,7 @@
 //  Created:
 //    28 Oct 2023, 13:05:57
 //  Last edited:
-//    29 Oct 2023, 17:24:55
+//    30 Oct 2023, 12:32:57
 //  Auto updated?
 //    Yes
 //
@@ -30,6 +30,9 @@ pub enum Error {
     Write { err: std::io::Error },
     /// Failed to read from the given reader.
     Read { err: std::io::Error },
+    /// Failed to flush the given writer.
+    #[cfg(feature = "async-tokio")]
+    Flush { err: std::io::Error },
     /// Failed to serialize the object to TOML.
     Serialize { err: toml::ser::Error },
     /// Failed to deserialize the object from TOML.
@@ -42,6 +45,8 @@ impl Display for Error {
         match self {
             Write { .. } => write!(f, "Failed to write to given writer"),
             Read { .. } => write!(f, "Failed to read from given reader"),
+            #[cfg(feature = "async-tokio")]
+            Flush { .. } => write!(f, "Failed to flush the given writer"),
             Serialize { .. } => write!(f, "Failed to serialize to TOML"),
             Deserialize { .. } => write!(f, "Failed to deserialize from TOML"),
         }
@@ -54,6 +59,8 @@ impl error::Error for Error {
         match self {
             Write { err } => Some(err),
             Read { err } => Some(err),
+            #[cfg(feature = "async-tokio")]
+            Flush { err } => Some(err),
             Serialize { err } => Some(err),
             Deserialize { err } => Some(err),
         }
@@ -163,9 +170,13 @@ impl<T: Send + Sync + for<'de> Deserialize<'de> + Serialize> serializer::Seriali
         let raw: String = <Self as serializer::Serializer>::to_string(value)?;
 
         // Now write to the writer
-        match writer.write_all(raw.as_bytes()).await {
+        if let Err(err) = writer.write_all(raw.as_bytes()).await {
+            return Err(Error::Write { err });
+        }
+        // ...making sure its flushed
+        match writer.flush().await {
             Ok(_) => Ok(()),
-            Err(err) => Err(Error::Write { err }),
+            Err(err) => Err(Error::Flush { err }),
         }
     }
 
@@ -180,9 +191,13 @@ impl<T: Send + Sync + for<'de> Deserialize<'de> + Serialize> serializer::Seriali
         let raw: String = <Self as serializer::Serializer>::to_string_pretty(value)?;
 
         // Now write to the writer
-        match writer.write_all(raw.as_bytes()).await {
+        if let Err(err) = writer.write_all(raw.as_bytes()).await {
+            return Err(Error::Write { err });
+        }
+        // ...making sure its flushed
+        match writer.flush().await {
             Ok(_) => Ok(()),
-            Err(err) => Err(Error::Write { err }),
+            Err(err) => Err(Error::Flush { err }),
         }
     }
 
