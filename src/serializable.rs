@@ -4,7 +4,7 @@
 //  Created:
 //    28 Oct 2023, 11:28:42
 //  Last edited:
-//    29 Oct 2023, 17:56:46
+//    30 Oct 2023, 10:54:30
 //  Auto updated?
 //    Yes
 //
@@ -102,26 +102,25 @@ impl<E: 'static + error::Error> error::Error for Error<E> {
 ///
 /// # Examples
 /// ```rust
-/// use serde::{Deserialize, Serialize};
-/// use serializable::json::Serializer;
+/// use serializable::dummy::Serializer;
 /// use serializable::Serializable;
 ///
-/// #[derive(Debug, Deserialize, Eq, PartialEq, Serialize)]
+/// #[derive(Debug, Default, Eq, PartialEq)]
 /// struct HelloWorld {
 ///     hello: String,
 ///     world: String,
 /// }
 /// impl Serializable<Serializer<HelloWorld>> for HelloWorld {}
 ///
+/// // Note: the dummy serializer doesn't actually serialize/deserialize any content. Check the features for proper ones!
 /// assert_eq!(
 ///     HelloWorld { hello: "Hello".into(), world: "World".into() }.to_string().unwrap(),
-///     "{\"hello\":\"Hello\",\"world\":\"World\"}"
+///     "<dummy_text>"
 /// );
-///
-/// assert_eq!(
-///     HelloWorld::from_str("{\"hello\":\"Goodbye\",\"world\":\"Planet\"}").unwrap(),
-///     HelloWorld { hello: "Goodbye".into(), world: "Planet".into() }
-/// )
+/// assert_eq!(HelloWorld::from_str("<dummy_text>").unwrap(), HelloWorld {
+///     hello: "".into(),
+///     world: "".into(),
+/// });
 /// ```
 pub trait Serializable<T: Serializer<Target = Self>> {
     // Serializer backend aliases
@@ -133,6 +132,22 @@ pub trait Serializable<T: Serializer<Target = Self>> {
     /// # Errors
     /// This function may error with an [`Error::SerializeString`] if the
     /// backend serializer failed to serialize.
+    ///
+    /// # Examples
+    /// ```rust
+    /// use serializable::dummy::Serializer;
+    /// use serializable::Serializable;
+    ///
+    /// #[derive(Debug, Default, Eq, PartialEq)]
+    /// struct HelloWorld {
+    ///     hello: String,
+    ///     world: String,
+    /// }
+    /// impl Serializable<Serializer<HelloWorld>> for HelloWorld {}
+    ///
+    /// // Note: the dummy serializer doesn't actually serialize/deserialize any content. Check the features for proper ones!
+    /// assert_eq!(HelloWorld { hello: "Hello".into(), world: "World".into() }.to_string().unwrap(), "<dummy_text>");
+    /// ```
     #[inline]
     fn to_string(&self) -> Result<String, Error<T::Error>> {
         match T::to_string(self) {
@@ -153,6 +168,22 @@ pub trait Serializable<T: Serializer<Target = Self>> {
     /// # Errors
     /// This function may error with an [`Error::SerializeString`] if the
     /// backend serializer failed to serialize.
+    ///
+    /// # Examples
+    /// ```rust
+    /// use serializable::dummy::Serializer;
+    /// use serializable::Serializable;
+    ///
+    /// #[derive(Debug, Default, Eq, PartialEq)]
+    /// struct HelloWorld {
+    ///     hello: String,
+    ///     world: String,
+    /// }
+    /// impl Serializable<Serializer<HelloWorld>> for HelloWorld {}
+    ///
+    /// // Note: the dummy serializer doesn't actually serialize/deserialize any content. Check the features for proper ones!
+    /// assert_eq!(HelloWorld { hello: "Hello".into(), world: "World".into() }.to_string_pretty().unwrap(), "Dummy Text");
+    /// ```
     #[inline]
     fn to_string_pretty(&self) -> Result<String, Error<T::Error>> {
         match T::to_string_pretty(self) {
@@ -170,6 +201,27 @@ pub trait Serializable<T: Serializer<Target = Self>> {
     /// This function may error with an [`Error::SerializeWriter`] if the
     /// backend serializer failed to serialize. This may also be because it
     /// failed to write to the `writer`.
+    ///
+    /// # Examples
+    /// ```rust
+    /// use serializable::dummy::Serializer;
+    /// use serializable::Serializable;
+    ///
+    /// #[derive(Debug, Default, Eq, PartialEq)]
+    /// struct HelloWorld {
+    ///     hello: String,
+    ///     world: String,
+    /// }
+    /// impl Serializable<Serializer<HelloWorld>> for HelloWorld {}
+    ///
+    /// // Note: the dummy serializer doesn't actually serialize/deserialize any content. Check the features for proper ones!
+    /// let mut buf: [u8; 12] = [0; 12];
+    /// HelloWorld { hello: "Hello".into(), world: "World".into() }.to_writer(&mut buf[..]).unwrap();
+    /// assert_eq!(String::from_utf8_lossy(&buf), "<dummy_text>");
+    ///
+    /// let mut buf: [u8; 0] = [];
+    /// assert!(matches!(HelloWorld { hello: "Hello".into(), world: "World".into() }.to_writer(&mut buf[..]), Err(serializable::Error::SerializeWriter { .. })));
+    /// ```
     #[inline]
     fn to_writer(&self, writer: impl Write) -> Result<(), Error<T::Error>> {
         match T::to_writer(self, writer) {
@@ -191,6 +243,27 @@ pub trait Serializable<T: Serializer<Target = Self>> {
     /// This function may error with an [`Error::SerializeWriter`] if the
     /// backend serializer failed to serialize. This may also be because it
     /// failed to write to the `writer`.
+    ///
+    /// # Examples
+    /// ```rust
+    /// use serializable::dummy::Serializer;
+    /// use serializable::Serializable;
+    ///
+    /// #[derive(Debug, Default, Eq, PartialEq)]
+    /// struct HelloWorld {
+    ///     hello: String,
+    ///     world: String,
+    /// }
+    /// impl Serializable<Serializer<HelloWorld>> for HelloWorld {}
+    ///
+    /// // Note: the dummy serializer doesn't actually serialize/deserialize any content. Check the features for proper ones!
+    /// let mut buf: [u8; 10] = [0; 10];
+    /// HelloWorld { hello: "Hello".into(), world: "World".into() }.to_writer_pretty(&mut buf[..]).unwrap();
+    /// assert_eq!(String::from_utf8_lossy(&buf), "Dummy Text");
+    ///
+    /// let mut buf: [u8; 0] = [];
+    /// assert!(matches!(HelloWorld { hello: "Hello".into(), world: "World".into() }.to_writer_pretty(&mut buf[..]), Err(serializable::Error::SerializeWriter { .. })));
+    /// ```
     #[inline]
     fn to_writer_pretty(&self, writer: impl Write) -> Result<(), Error<T::Error>> {
         match T::to_writer_pretty(self, writer) {
@@ -402,11 +475,39 @@ pub trait Serializable<T: Serializer<Target = Self>> {
 ///
 /// Note that not all backends have an optimal asynchronous implementation. [`serde`](https://serde.rs)-related backends, for example,
 /// fallback to reading the entire file or reader asynchronously before parsing it as a string.
+///
+/// # Examples
+/// ```rust
+/// use serializable::dummy::Serializer;
+/// use serializable::{Serializable, SerializableAsync as _};
+///
+/// #[derive(Debug, Default, Eq, PartialEq)]
+/// struct HelloWorld {
+///     hello: String,
+///     world: String,
+/// }
+/// impl Serializable<Serializer<HelloWorld>> for HelloWorld {}
+///
+/// # tokio_test::block_on(async {
+/// // Note: the dummy serializer doesn't actually serialize/deserialize any content. Check the features for proper ones!
+/// let mut buf: Vec<u8> = vec![];
+/// HelloWorld { hello: "Hello".into(), world: "World".into() }.to_writer_async(&mut buf).await.unwrap();
+/// assert_eq!(
+///     String::from_utf8_lossy(&buf),
+///     "<dummy_text>"
+/// );
+///
+/// let mut buf: Vec<u8> = (*b"<dummy_text>").into();
+/// assert_eq!(HelloWorld::from_reader_async(&buf[..]).await.unwrap(), HelloWorld {
+///     hello: "".into(),
+///     world: "".into(),
+/// });
+/// # });
+/// ```
 #[cfg(feature = "async-tokio")]
 #[async_trait::async_trait]
-pub trait SerializableAsync<T: Serializer<Target = Self> + crate::serializer::SerializerAsync>: Serializable<T>
+pub trait SerializableAsync<T: Send + Sync + Serializer<Target = Self> + crate::serializer::SerializerAsync>: Serializable<T>
 where
-    T: Send + Sync,
     T::Target: Send + Sync,
 {
     // Serializes this object to the given writer asynchronously.
@@ -605,3 +706,5 @@ where
         if pretty { self.to_path_pretty_async(path).await } else { self.to_path_async(path).await }
     }
 }
+#[cfg(feature = "async-tokio")]
+impl<T: Send + Sync + Serializable<S>, S: Send + Sync + Serializer<Target = T> + crate::serializer::SerializerAsync> SerializableAsync<S> for T {}

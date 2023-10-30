@@ -4,7 +4,7 @@
 //  Created:
 //    24 Oct 2023, 22:36:08
 //  Last edited:
-//    29 Oct 2023, 14:11:06
+//    30 Oct 2023, 10:44:09
 //  Auto updated?
 //    Yes
 //
@@ -25,6 +25,8 @@ pub mod toml;
 pub mod yaml;
 
 // Bring some of that into the crate namespace
+#[cfg(feature = "async-tokio")]
+pub use serializable::SerializableAsync;
 pub use serializable::{Error, Serializable};
 pub use serializer::Serializer;
 #[cfg(feature = "async-tokio")]
