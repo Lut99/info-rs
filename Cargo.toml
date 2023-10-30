@@ -1,9 +1,9 @@
 [package]
-name = "info"
+name = "serializable"
 version = "0.1.0"
 edition = "2021"
 authors = [ "Lut99" ]
-description = "Provides a helper trait for [serde](https://serde.rs) types that makes working with them slightly nicer."
+description = "Provides helper traits for [serde](https://serde.rs) types that makes working with them slightly nicer."
 repository = "https://github.com/Lut99/info-rs"
 
 
@@ -13,6 +13,7 @@ serde = { version = "1.0", features = ["derive"], optional = true }
 serde_json = { version = "1.0", optional = true }
 serde_yaml = { version = "0.9", optional = true }
 tokio = { version = "1.33", default-features = false, features = ["fs","io-util"], optional = true }
+toml = { version = "0.8", optional = true }
 
 
 [dev-dependencies]
@@ -22,4 +23,5 @@ tokio-test = "0.4"
 [features]
 "async-tokio" = [ "dep:async-trait", "dep:tokio" ]
 "serde-json" = [ "dep:serde", "dep:serde_json" ]
+"serde-toml" = [ "dep:serde", "dep:toml" ]
 "serde-yaml" = [ "dep:serde", "dep:serde_yaml" ]
